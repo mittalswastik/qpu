@@ -123,7 +123,7 @@ int main() {
             // sleep(1);
             circuit->apply_hadamard(0);
             circuit->apply_cnot(0, 1);
-            circuit->test = "checked";
+            circuit->test = "checking";
             //printf(" %d ",c[i]);
         }
     }
