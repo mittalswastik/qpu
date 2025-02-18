@@ -35,7 +35,7 @@ public:
     string test;
     
     QuantumCircuitWrapper(int num_qubits) : num_qubits(num_qubits) {
-        test = "checking";
+        test = "check";
     }
 
     void apply_hadamard(int qubit) {
@@ -55,9 +55,19 @@ public:
         return execute_python_script(script);
     }
 
+    void parseToVector(void* ptr, size_t size, std::vector<int32_t> vec){
+        std::cout<<" size of the the vector is: "<<size<<std::endl;
+        intptr_t intPtr = reinterpret_cast<intptr_t> (ptr); // Cast void* to int*
+        int32_t *intVal = reinterpret_cast<int32_t*>(intPtr);
+        size = size/sizeof(int32_t);
+        vec.assign(intVal, intVal + size);   // Populate vector using a range
+        vec_data.push_back(vec);
+    }
+
 private:
     int num_qubits;
     string gates;
+    vector<vector<int32_t> > vec_data;
 
     string generate_python_script(const string& circuit_name, int num_qubits, const string& gates) {
         std::ostringstream script;
@@ -119,13 +129,11 @@ int main() {
     QuantumCircuitWrapper *circuit = new QuantumCircuitWrapper(2);
     #pragma omp target firstprivate(circuit) device(100) map(to: a[0:N], b[0:N]) map(from: c[0:N])
     {
-        for (int i = 0; i < N; i++) {
-            // sleep(1);
-            circuit->apply_hadamard(0);
-            circuit->apply_cnot(0, 1);
-            circuit->test = "checking";
-            //printf(" %d ",c[i]);
-        }
+        // sleep(1);
+        circuit->apply_hadamard(0);
+        circuit->apply_cnot(0, 1);
+        circuit->test = "checking";
+        //printf(" %d ",c[i]);
     }
 
     // Check results
@@ -135,7 +143,10 @@ int main() {
     printf("\n");
 
     if (errors == 0) {
-        printf("Success! All values are correct.\n");
+        printf("Success! All values are correct. Printing c value below\n");
+        for(int i = 0 ; i < N ; i++){
+            printf("%d",c[i]);
+        }
     } else {
         printf("Failed with %d errors.\n", errors);
     }
