@@ -1,8 +1,8 @@
 ## T-Tex
 
-``git clone git@github.com:mittalswastik/qpu.git`` \
+``git clone https://github.com/mittalswastik/qpu.git`` \
 ``cd qpu``\
-``git clone git@github.com:mittalswastik/llvm-project.git`` \
+``git clone `` \
 ``cd lvm-project`` \
 ``git checkout quantum_lib``
 
