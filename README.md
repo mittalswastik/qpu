@@ -3,7 +3,7 @@
 ``git clone git@github.com:mittalswastik/qpu.git`` \
 ``cd qpu``\
 ``git clone git@github.com:mittalswastik/llvm-project.git`` \
-``cd lvm-project``
+``cd lvm-project`` \
 ``git checkout quantum_lib``
 
 Repository should be: ~/qpu/llvm-project
