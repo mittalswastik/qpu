@@ -1,7 +1,7 @@
 ## T-Tex
 
-Clone this repository
-Clone the repository and switch to branch [ttex_update](https://github.com/mittalswastik/ttex_implementation/tree/ttex_update)
+``git clone git@github.com:mittalswastik/qpu.git`` \
+``cd lvm-project``
   
 ### T-Tex Setup: Manual installation (if scr script runs into issues)
 
