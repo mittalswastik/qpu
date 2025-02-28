@@ -19,6 +19,6 @@
 12. ``sudo ninja -j4`` \
    *``-jn``, n is number of threads used to build llvm (more n results in faster build but slower linking) \
    *g++ version issue:
-        ** ``unintptr_t`` was not declared error: Fix - add [``#include <cstdint>``](https://github.com/mittalswastik/ttex_implementation/blob/e7740356386e840ddadd91d502daf8a8ef612f21/llvm/include/llvm/Support/Signals.h#L18)
+        ** ``unintptr_t`` was not declared error: Fix - add [``#include <cstdint>``](https://github.com/mittalswastik/llvm-project/blob/82d8185c19fca4eb25f4e45ce1036d9c06ea7470/llvm/include/llvm/Support/Signals.h#L17)
 13. ``../binutils/configure --enable-gold --enable-plugins --disable-werror``
 14. ``make all-gold``
