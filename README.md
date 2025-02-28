@@ -2,7 +2,7 @@
 
 ``git clone https://github.com/mittalswastik/qpu.git`` \
 ``cd qpu``\
-``git clone `` \
+``git clone https://github.com/mittalswastik/llvm-project.git`` \
 ``cd lvm-project`` \
 ``git checkout quantum_lib``
 
