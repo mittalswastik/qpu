@@ -35,3 +35,7 @@ Repository should be: ~/qpu/llvm-project
 ### Execution
 
 ``cd ~/qpu``
+``export LD_LIBRARY_PATH=/qpu/llvm-project/build_offload/lib:$LD_LIBRARY_PATH
+``~/qpu/llvm-project/build_offload/bin/clang++  -g test_omp_offload.cpp  -fopenmp -fopenmp-targets=x86_64-unknown-linux-gnu --offload-arch=x86-64 -o test``
+``./test``
+
