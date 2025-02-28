@@ -1,7 +1,10 @@
 ## T-Tex
 
 ``git clone git@github.com:mittalswastik/qpu.git`` \
+``cd qpu``\
+``git clone git@github.com:mittalswastik/llvm-project.git`` \
 ``cd lvm-project``
+``git checkout quantum_lib``
 
 Repository should be: ~/qpu/llvm-project
   
@@ -28,3 +31,7 @@ Repository should be: ~/qpu/llvm-project
 16. ``mkdir build_offload``
 17. ``cd build_offload``
 18. ``cmake -DCMAKE_CXX_COMPILER=~/qpu/llvm-project/build/bin/clang++  -DCMAKE_C_COMPILER=~/qpu/llvm-project/build/bin/clang  -DCUDAToolkit_INCLUDE_DIRECTORIES="/usr/local/cuda-11.4"  -DCMAKE_BUILD_TYPE=Release -DLLVM_USE_LINKER=gold -DLLVM_TARGETS_TO_BUILD="X86;NVPTX" -DLLVM_ENABLE_PROJECTS="clang;lld;openmp" -DLLVM_ENABLE_RUNTIMES="offload" -G "Unix Makefiles" ../llvm``
+
+### Execution
+
+``cd ~/qpu`` \
