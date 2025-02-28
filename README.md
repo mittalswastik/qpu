@@ -34,4 +34,4 @@ Repository should be: ~/qpu/llvm-project
 
 ### Execution
 
-``cd ~/qpu`` \
+``cd ~/qpu``
