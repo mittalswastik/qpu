@@ -2,6 +2,8 @@
 
 ``git clone git@github.com:mittalswastik/qpu.git`` \
 ``cd lvm-project``
+
+Repository should be: ~/qpu/llvm-project
   
 ### T-Tex Setup: Manual installation (if scr script runs into issues)
 
@@ -22,3 +24,7 @@
         ** ``unintptr_t`` was not declared error: Fix - add [``#include <cstdint>``](https://github.com/mittalswastik/llvm-project/blob/82d8185c19fca4eb25f4e45ce1036d9c06ea7470/llvm/include/llvm/Support/Signals.h#L17)
 13. ``../binutils/configure --enable-gold --enable-plugins --disable-werror``
 14. ``make all-gold``
+15. ``cd ..``
+16. ``mkdir build_offload``
+17. ``cd build_offload``
+18. ``cmake -DCMAKE_CXX_COMPILER=~/qpu/llvm-project/build/bin/clang++  -DCMAKE_C_COMPILER=~/qpu/llvm-project/build/bin/clang  -DCUDAToolkit_INCLUDE_DIRECTORIES="/usr/local/cuda-11.4"  -DCMAKE_BUILD_TYPE=Release -DLLVM_USE_LINKER=gold -DLLVM_TARGETS_TO_BUILD="X86;NVPTX" -DLLVM_ENABLE_PROJECTS="clang;lld;openmp" -DLLVM_ENABLE_RUNTIMES="offload" -G "Unix Makefiles" ../llvm
