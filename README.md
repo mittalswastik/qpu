@@ -30,6 +30,12 @@ Repository should be: ~/qpu/llvm-project
 15. ``cd build_offload``
 16. ``cmake -DCMAKE_CXX_COMPILER=~/qpu/llvm-project/build/bin/clang++  -DCMAKE_C_COMPILER=~/qpu/llvm-project/build/bin/clang  -DCUDAToolkit_INCLUDE_DIRECTORIES="/usr/local/cuda-11.4"  -DCMAKE_BUILD_TYPE=Release -DLLVM_USE_LINKER=gold -DLLVM_TARGETS_TO_BUILD="X86;NVPTX" -DLLVM_ENABLE_PROJECTS="clang;lld;openmp" -DLLVM_ENABLE_RUNTIMES="offload" -G "Unix Makefiles" ../llvm``
 
+### Execution flags
+
+* Either copy omp.h & omp_tools.h (should be in ~/build/projects/openmp/runtime/src/) generated after compiling llvm to the same directory as the benchmark or add path using -I flag
+  * omp.h - OpenMP runtime library
+  * omp-tools.h - OpenMP ompt profiler too
+
 ### Execution
 
 ``cd ~/qpu`` \
