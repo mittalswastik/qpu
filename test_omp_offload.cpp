@@ -17,6 +17,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <cstdio>
+//#include "/home/swastik/dev/openmp_offload/llvm-project/offload/include/quantum_circuit_wrapper.h"
 
 using namespace std;
 
@@ -52,6 +53,14 @@ public:
         gates += "circuit.x(" + to_string(qubit) + ")\n";
     }
 
+    void apply_barrier(){
+        gates += "circuit.barrier()\n";
+    }
+
+    void measure(){
+        gates += "circuit.measure_all()\n";
+    }
+
     std::string run() {
         std::string script = generate_python_script("circuit", num_qubits, gates);
         return execute_python_script(script);
@@ -78,8 +87,15 @@ private:
 
     std::string generate_python_script(const std::string& circuit_name, int num_qubits, const std::string& gates) {
     std::ostringstream script;
-    script << "from qiskit import QuantumCircuit, Aer, execute\n";
-    script << "circuit = QuantumCircuit(" << num_qubits << ")\n";
+    script << "import sys\n";
+    script << "import json\n";
+    script << "import supermarq\n";
+    script << "import qiskit\n";
+    script << "import matplotlib.pyplot as plt\n";
+    script << "import numpy as np\n";
+    script << "from qiskit import QuantumCircuit, execute\n";
+    script << "from qiskit.providers.dax import DAX\n";
+    script << "import sequre\n";
     //processong function
     script << "def process_data(data):\n";
     script << "    # Example processing: square each number\n";
@@ -87,18 +103,29 @@ private:
 
     // Read JSON data from command line argument
     script << "if __name__ == \"__main__\":\n";
-    script << " if len(sys.argv) < 2:\n";
-    script << "     print('Error: No input data provided')\n";
-    script << "     sys.exit(1)\n\n";
-
-    script << " input_data = json.loads(sys.argv[1])\n";
-    script << " processed_data = process_data(input_data)\n";
-    script << " print('Processed Data:', processed_data)\n\n";
-    script << gates;
-    script << " backend = Aer.get_backend('statevector_simulator')\n";
-    script << " result = execute(circuit, backend).result()\n";
-    script << " statevector = result.get_statevector()\n";
-    script << " print(statevector)\n";
+    script << "    if len(sys.argv) < 2:\n";
+    script << "        print('Error: No input data provided')\n";
+    script << "        sys.exit(1)\n\n";
+    script << "    circuit = QuantumCircuit(" << num_qubits << "," <<num_qubits << ")\n";
+    script << "    smarq = supermarq.hamiltonian_simulation.HamiltonianSimulation(" << num_qubits << ")\n";
+    script << "    smarq = supermarq.ghz.GHZ(" << num_qubits << ")\n";
+    script << "    input_data = json.loads(sys.argv[1])\n";
+    //script << "    processed_data = process_data(input_data)\n";
+    std::string line;
+    std::istringstream ss(gates);
+    while(std::getline(ss, line)) {
+        script << "    " << line << "\n"; // Adds indentation to each line
+    }
+    //script << gates;
+    script << "    circuit.measure_all()\n";
+    script << "    backend_name = 'dax_code_simulator'\n";
+    script << "    backend_name = 'dax_code_printer'\n";
+    script << "    backend = dax.get_backend(backend_name)\n";
+    script << "    backend.load_config("<<"\"resources.toml\""<<")\n";
+    script << "    dax_job = execute(circuit, backend, shots=30, optimization_level=0)\n";
+    script << "    client = sequre.UserClient()\n";
+    script << "    workload = dax_job.get_dax()\n";
+    script << "    print(workload)";
     return script.str();
 }
 
@@ -162,12 +189,17 @@ int main() {
     }
 
     // Offload computation to GPU (assuming device 0)
-    QuantumCircuitWrapper *circuit = new QuantumCircuitWrapper(2);
+    int qubits = 4;
+    QuantumCircuitWrapper *circuit = new QuantumCircuitWrapper(qubits);
     #pragma omp target firstprivate(circuit) device(100) map(to: a[0:N], b[0:N]) map(from: c[0:N])
     {
         // sleep(1);
         circuit->apply_hadamard(0);
-        circuit->apply_cnot(0, 1);
+        for(int i = 0 ; i < qubits; i++){
+            circuit->apply_cnot(i, i+1);
+        }
+        circuit->apply_barrier();
+        circuit->measure();
         circuit->test = "checking";
         // for(int i = 0 ; i < N ; i++) {
         //     c[i] = b[i]/a[i];
