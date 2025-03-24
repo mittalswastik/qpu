@@ -193,6 +193,8 @@ private:
     }
 };
 
+#pragma omp requires reverse_offload
+
 // Function to execute a command and get the output
 int main() {
     // Check for the number of devices available
@@ -218,36 +220,33 @@ int main() {
     // Offload computation to GPU (assuming device 0)
     int qubits = 4;
     QuantumCircuitWrapper *circuit = new QuantumCircuitWrapper(qubits);
-    #pragma omp requires reverse_offload
-    {
-        #pragma omp target
+    
+    for(int i = 0 ; i < 1 ; i++){
+        #pragma omp target firstprivate(circuit) device(100) map(to: a[0:N], b[0:N]) //map(from: c[0:N])
         {
-            for(int i = 0 ; i < 10 ; i++){
-                #pragma omp target firstprivate(circuit) device(100) map(to: a[0:N], b[0:N]) map(from: c[0:N])
-                {
-                    // sleep(1);
-                    circuit->apply_hadamard(0);
-                    for(int i = 0 ; i < qubits; i++){
-                        circuit->apply_cnot(i, i+1);
-                    }
-                    circuit->apply_barrier();
-                    circuit->measure();
-                    circuit->execute_basic_quantum();
-                    circuit->test = "not working";
-                    // for(int i = 0 ; i < N ; i++) {
-                    //     c[i] = b[i]/a[i];
-                    // }
-                    //printf(" %d ",c[i]);
-                    func();
-                }
-
-                #pragma omp target firsprivate(circuit) device(ancestor: 1) map(from: a[0:N])
-                {
-                    func();
-                    circuit->test = "testing";
-                }
+            // sleep(1);
+            circuit->apply_hadamard(0);
+            for(int i = 0 ; i < qubits; i++){
+                circuit->apply_cnot(i, i+1);
             }
-        }   
+            circuit->apply_barrier();
+            circuit->measure();
+            circuit->execute_basic_quantum();
+            circuit->test = "not working";
+            // for(int i = 0 ; i < N ; i++) {
+            //     c[i] = b[i]/a[i];
+            // }
+            //printf(" %d ",c[i]);
+            func();
+        }
+
+        #pragma omp target device(ancestor: 1) map(from: c[0:N])
+        {
+            circuit->test = "[precheck]";
+            for(int k = 0 ; k < N ; k++) {
+                c[k] *= 2;
+            }
+        }
     }
 
     // Check results
