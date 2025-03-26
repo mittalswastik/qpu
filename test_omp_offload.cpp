@@ -61,6 +61,29 @@ public:
         gates += "circuit.measure_all()\n";
     }
 
+    void apply_hamiltonian_qiskit(){
+        gates += "smarq = supermarq.hamiltonian_simulation.HamiltonianSimulation(" + std::to_string(num_qubits) + ")\n";
+        gates += "circuit = smarq.qisket_circuit()\n";
+        gates += "print(circuit)\n";
+    }
+
+    void apply_ghz_qiskit(){
+        gates += "smarq = supermarq.ghz.GHZ(" + std::to_string(num_qubits) + ")\n";
+        gates += "circuit = smarq.qisket_circuit()\n";
+        gates += "print(circuit)\n";
+    }
+
+    void execute_basic_quantum(){
+        scr += "backend_name = 'dax_code_simulator'\n";
+        scr += "backend_name = 'dax_code_printer'\n";
+        scr += "backend = dax.get_backend(backend_name)\n";
+        scr += "backend.load_config(\"resources.toml\")\n";
+        scr += "dax_job = execute(circuit, backend, shots=30, optimization_level=0)\n";
+        scr += "client = sequre.UserClient()\n";
+        scr += "workload = dax_job.get_dax()\n";
+        scr += "print(workload)";
+    }
+
     std::string run() {
         std::string script = generate_python_script("circuit", num_qubits, gates);
         return execute_python_script(script);
@@ -84,50 +107,55 @@ public:
 private:
     int num_qubits;
     string gates;
+    string scr;
 
     std::string generate_python_script(const std::string& circuit_name, int num_qubits, const std::string& gates) {
-    std::ostringstream script;
-    script << "import sys\n";
-    script << "import json\n";
-    script << "import supermarq\n";
-    script << "import qiskit\n";
-    script << "import matplotlib.pyplot as plt\n";
-    script << "import numpy as np\n";
-    script << "from qiskit import QuantumCircuit, execute\n";
-    script << "from qiskit.providers.dax import DAX\n";
-    script << "import sequre\n";
-    //processong function
-    script << "def process_data(data):\n";
-    script << "    # Example processing: square each number\n";
-    script << "    return [[x * x for x in row] for row in data]\n\n";
+        std::ostringstream script;
+        script << "import sys\n";
+        script << "import json\n";
+        script << "import supermarq\n";
+        script << "import qiskit\n";
+        script << "import matplotlib.pyplot as plt\n";
+        script << "import numpy as np\n";
+        script << "from qiskit import QuantumCircuit, execute\n";
+        script << "from qiskit.providers.dax import DAX\n";
+        script << "import sequre\n";
+        //processong function
+        script << "def process_data(data):\n";
+        script << "    # Example processing: square each number\n";
+        script << "    return [[x * x for x in row] for row in data]\n\n";
 
-    // Read JSON data from command line argument
-    script << "if __name__ == \"__main__\":\n";
-    script << "    if len(sys.argv) < 2:\n";
-    script << "        print('Error: No input data provided')\n";
-    script << "        sys.exit(1)\n\n";
-    script << "    circuit = QuantumCircuit(" << num_qubits << "," <<num_qubits << ")\n";
-    script << "    smarq = supermarq.hamiltonian_simulation.HamiltonianSimulation(" << num_qubits << ")\n";
-    script << "    smarq = supermarq.ghz.GHZ(" << num_qubits << ")\n";
-    script << "    input_data = json.loads(sys.argv[1])\n";
-    //script << "    processed_data = process_data(input_data)\n";
-    std::string line;
-    std::istringstream ss(gates);
-    while(std::getline(ss, line)) {
-        script << "    " << line << "\n"; // Adds indentation to each line
+        // Read JSON data from command line argument
+        script << "if __name__ == \"__main__\":\n";
+        script << "    if len(sys.argv) < 2:\n";
+        script << "        print('Error: No input data provided')\n";
+        script << "        sys.exit(1)\n\n";
+        script << "    input_data = json.loads(sys.argv[1])\n";
+        script << "    circuit = QuantumCircuit(" << num_qubits << "," <<num_qubits << ")\n";
+        //script << "    processed_data = process_data(input_data)\n";
+        std::string line;
+        std::istringstream ss(gates);
+        while(std::getline(ss, line)) {
+            script << "    " << line << "\n"; // Adds indentation to each line
+        }
+
+        std::string line2;
+        std::istringstream ss2(scr);
+        while(std::getline(ss2, line2)) {
+            std::cout<<line2<<std::endl;    
+            script << "    " << line2 << "\n"; // Adds indentation to each line
+        }
+        //script << gates;
+        // script << "    backend_name = 'dax_code_simulator'\n";
+        // script << "    backend_name = 'dax_code_printer'\n";
+        // script << "    backend = dax.get_backend(backend_name)\n";
+        // script << "    backend.load_config("<<"\"resources.toml\""<<")\n";
+        // script << "    dax_job = execute(circuit, backend, shots=30, optimization_level=0)\n";
+        // script << "    client = sequre.UserClient()\n";
+        // script << "    workload = dax_job.get_dax()\n";
+        // script << "    print(workload)";
+        return script.str();
     }
-    //script << gates;
-    script << "    circuit.measure_all()\n";
-    script << "    backend_name = 'dax_code_simulator'\n";
-    script << "    backend_name = 'dax_code_printer'\n";
-    script << "    backend = dax.get_backend(backend_name)\n";
-    script << "    backend.load_config("<<"\"resources.toml\""<<")\n";
-    script << "    dax_job = execute(circuit, backend, shots=30, optimization_level=0)\n";
-    script << "    client = sequre.UserClient()\n";
-    script << "    workload = dax_job.get_dax()\n";
-    script << "    print(workload)";
-    return script.str();
-}
 
     std::string execute_python_script(const std::string& script) {
         std::string json_data = "[";
@@ -201,6 +229,7 @@ int main() {
         circuit->apply_barrier();
         circuit->measure();
         circuit->test = "checking";
+        circuit->execute_basic_quantum();
         // for(int i = 0 ; i < N ; i++) {
         //     c[i] = b[i]/a[i];
         // }
