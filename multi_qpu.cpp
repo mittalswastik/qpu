@@ -56,7 +56,7 @@ public:
     }
 
     void apply_ry(double angle, int val) {
-        gates += "apply_ry(" + std::to_string(angle) + ", "+  std::to_string(val) + ")\n";
+        gates += "circuit.ry(" + std::to_string(angle) + ", "+  std::to_string(val) + ")\n";
     }
 
     void apply_barrier(){
@@ -80,14 +80,17 @@ public:
     }
 
     void execute_basic_quantum(){
-        scr += "backend_name = 'dax_code_simulator'\n";
-        scr += "backend_name = 'dax_code_printer'\n";
-        scr += "backend = dax.get_backend(backend_name)\n";
-        scr += "backend.load_config(\"resources.toml\")\n";
-        scr += "dax_job = execute(circuit, backend, shots=30, optimization_level=0)\n";
-        scr += "client = sequre.UserClient()\n";
-        scr += "workload = dax_job.get_dax()\n";
-        scr += "print(workload)";
+        // scr += "backend_name = 'dax_code_simulator'\n";
+        // scr += "backend_name = 'dax_code_printer'\n";
+        // scr += "backend = dax.get_backend(backend_name)\n";
+        // scr += "backend.load_config(\"resources.toml\")\n";
+        scr += "backend = Aer.get_backend('statevector_simulator')\n";
+        // scr += "dax_job = execute(circuit, backend, shots=30, optimization_level=0)\n";
+        scr += "counts = execute(circuit, backend, shots=100).result().get_counts()\n";
+        scr += "print(counts)";
+        // scr += "client = sequre.UserClient()\n";
+        // scr += "workload = dax_job.get_dax()\n";
+        // scr += "print(workload)";
     }
 
     std::string run() {
@@ -119,13 +122,13 @@ private:
         std::ostringstream script;
         script << "import sys\n";
         script << "import json\n";
-        script << "import supermarq\n";
+        // script << "import supermarq\n";
         script << "import qiskit\n";
-        script << "import matplotlib.pyplot as plt\n";
-        script << "import numpy as np\n";
+        // script << "import matplotlib.pyplot as plt\n";
+        // script << "import numpy as np\n";
         script << "from qiskit import QuantumCircuit, execute\n";
-        script << "from qiskit.providers.dax import DAX\n";
-        script << "import sequre\n";
+        // script << "from qiskit.providers.dax import DAX\n";
+        // script << "import sequre\n";
         //processong function
         script << "def process_data(data):\n";
         script << "    # Example processing: square each number\n";
@@ -315,12 +318,12 @@ int main() {
                     //QuantumCircuitWrapper_apply_cnot(circuit,i,i+1);
                 }
 
-                for(int i = 0 ; i < qubits; i++){
+                for(int i = 0 ; i < qubits - 1; i++){
                     circuit->apply_cnot(i, i+1);
                     //QuantumCircuitWrapper_apply_cnot(circuit,i,i+1);
                 }
 
-                for(int i = 0 ; i < qubits-1; i++){
+                for(int i = 0 ; i < qubits; i++){
                     circuit->apply_ry(angle_threads[omp_get_thread_num()][i+1], i+1);
                     //QuantumCircuitWrapper_apply_cnot(circuit,i,i+1);
                 }
