@@ -55,6 +55,10 @@ public:
         gates += "circuit.x(" + to_string(qubit) + ")\n";
     }
 
+    void apply_ry(double angle, int val) {
+        gates += "apply_ry(" + std::to_string(angle) + ", "+  std::to_string(val) + ")\n";
+    }
+
     void apply_barrier(){
         gates += "circuit.barrier()\n";
     }
@@ -219,6 +223,50 @@ private:
     }
 };
 
+// std::vector<double> evaluate_new_angles(const std::vector<std::vector<int>>& results) {
+//     std::vector<double> new_angles;
+//     new_angles.reserve(results.size());
+
+//     for (const auto& bitstring : results) {
+//         int sum_bits = std::accumulate(bitstring.begin(), bitstring.end(), 0);
+//         size_t num_qubits = bitstring.size();
+//         double angle = (static_cast<double>(sum_bits) * M_PI) / num_qubits;
+//         new_angles.push_back(angle);
+//     }
+
+//     return new_angles;
+// }
+
+std::vector<double> evaluate_new_angles_from_freq_array(std::vector<int> frequencies) {
+    int num_entries = frequencies.size();
+    if (num_entries == 0) return {};
+
+    int num_qubits = 0;
+    while ((1 << num_qubits) < num_entries) ++num_qubits;
+
+    std::vector<int> one_counts(num_qubits, 0);
+    int total_counts = 0;
+
+    for (int i = 0; i < num_entries; ++i) {
+        int freq = frequencies[i];
+        total_counts += freq;
+
+        for (int q = 0; q < num_qubits; ++q) {
+            if ((i >> (num_qubits - q - 1)) & 1) {
+                one_counts[q] += freq;
+            }
+        }
+    }
+
+    std::vector<double> angles(num_qubits);
+    for (int q = 0; q < num_qubits; ++q) {
+        double freq_q = static_cast<double>(one_counts[q]) / total_counts;
+        angles[q] = freq_q * M_PI;
+    }
+
+    return angles;
+}
+
 // Function to execute a command and get the output
 int main() {
     // Check for the number of devices available
@@ -243,30 +291,55 @@ int main() {
 
     // Offload computation to GPU (assuming device 0)
     int qubits = 4;
+    vector<int> qubits_freq(qubits);
+    for(int j = 0 ; j < qubits ; j++){
+        qubits_freq[j] = 0;
+    }
+
+    std::vector<double> angles = evaluate_new_angles_from_freq_array(qubits_freq);
+    omp_set_num_threads(3);
     //QuantumCircuitWrapper *circuit = QuantumCircuitWrapper_create(qubits);
-    #pragma omp parallel num_threads(3)
+    std::vector< std::vector<double> > angle_threads(3, angles);
+    #pragma omp parallel
     {
-        QuantumCircuitWrapper *circuit = new QuantumCircuitWrapper(qubits);
-        #pragma omp target firstprivate(circuit) device(100) map(to: a[0:N], b[0:N]) map(from: c[0:N])
-        {
-            // sleep(1);
-            circuit->apply_hadamard(0);
-            //QuantumCircuitWrapper_apply_hadamard(circuit,0);
-            for(int i = 0 ; i < qubits; i++){
-                circuit->apply_cnot(i, i+1);
-                //QuantumCircuitWrapper_apply_cnot(circuit,i,i+1);
+        for(int k = 0 ; k < 5 ; k++){
+            QuantumCircuitWrapper *circuit = new QuantumCircuitWrapper(qubits);
+            #pragma omp target firstprivate(circuit) device(100) map(to: a[0:N], b[0:N]) map(from: c[0:N])
+            {
+                // sleep(1);
+                //circuit->apply_hadamard(0);
+                //QuantumCircuitWrapper_apply_hadamard(circuit,0);
+                for(int i = 0 ; i < qubits; i++){
+                    //circuit->apply_cnot(i, i+1);
+                    circuit->apply_ry(angle_threads[omp_get_thread_num()][i], i);
+                    //QuantumCircuitWrapper_apply_cnot(circuit,i,i+1);
+                }
+
+                for(int i = 0 ; i < qubits; i++){
+                    circuit->apply_cnot(i, i+1);
+                    //QuantumCircuitWrapper_apply_cnot(circuit,i,i+1);
+                }
+
+                for(int i = 0 ; i < qubits-1; i++){
+                    circuit->apply_ry(angle_threads[omp_get_thread_num()][i+1], i+1);
+                    //QuantumCircuitWrapper_apply_cnot(circuit,i,i+1);
+                }
+                //circuit->apply_barrier();
+                //QuantumCircuitWrapper_apply_barrier(circuit);
+                circuit->measure();
+                //QuantumCircuitWrapper_measure(circuit);
+                //circuit->test = "checking";
+                circuit->execute_basic_quantum();
+                //QuantumCircuitWrapper_execute_basic_quantum(circuit);
+                // for(int i = 0 ; i < N ; i++) {
+                //     c[i] = b[i]/a[i];
+                // }
+                //printf(" %d ",c[i]);
             }
-            circuit->apply_barrier();
-            //QuantumCircuitWrapper_apply_barrier(circuit);
-            circuit->measure();
-            //QuantumCircuitWrapper_measure(circuit);
-            //circuit->test = "checking";
-            circuit->execute_basic_quantum();
-            //QuantumCircuitWrapper_execute_basic_quantum(circuit);
-            // for(int i = 0 ; i < N ; i++) {
-            //     c[i] = b[i]/a[i];
-            // }
-            //printf(" %d ",c[i]);
+
+            angle_threads[omp_get_thread_num()] = evaluate_new_angles_from_freq_array(circuit->evaluated_qubits);
+
+            // eventually make it memory efficient - call a dstructor here and push object creation outside loop - no need to call construnctor n number of times
         }
     }
 
