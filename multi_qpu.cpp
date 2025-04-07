@@ -56,7 +56,7 @@ public:
     }
 
     void apply_ry(double angle, int val) {
-        gates += "circuit.ry(" + std::to_string(angle) + ", "+  std::to_string(val) + ")\n";
+        gates += "circuit.ry(" + std::to_string(0.456) + ", "+  std::to_string(val) + ")\n";
     }
 
     void apply_barrier(){
@@ -126,7 +126,7 @@ private:
         script << "import qiskit\n";
         // script << "import matplotlib.pyplot as plt\n";
         // script << "import numpy as np\n";
-        script << "from qiskit import QuantumCircuit, execute\n";
+        script << "from qiskit import QuantumCircuit, execute, Aer\n";
         // script << "from qiskit.providers.dax import DAX\n";
         // script << "import sequre\n";
         //processong function
@@ -139,7 +139,7 @@ private:
         script << "    if len(sys.argv) < 2:\n";
         script << "        print('Error: No input data provided')\n";
         script << "        sys.exit(1)\n\n";
-        script << "    input_data = json.loads(sys.argv[1])\n";
+        // script << "    input_data = json.loads(sys.argv[1])\n";
         script << "    circuit = QuantumCircuit(" << num_qubits << "," <<num_qubits << ")\n";
         //script << "    processed_data = process_data(input_data)\n";
         std::string line;
@@ -324,7 +324,7 @@ int main() {
                 }
 
                 for(int i = 0 ; i < qubits; i++){
-                    circuit->apply_ry(angle_threads[omp_get_thread_num()][i+1], i+1);
+                    circuit->apply_ry(angle_threads[omp_get_thread_num()][i+1], i);
                     //QuantumCircuitWrapper_apply_cnot(circuit,i,i+1);
                 }
                 //circuit->apply_barrier();
