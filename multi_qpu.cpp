@@ -11,6 +11,7 @@
 #include <unistd.h>
 
 #define N 10
+#define max_threads 5
 
 
 #include <fstream>
@@ -56,7 +57,7 @@ public:
     }
 
     void apply_ry(double angle, int val) {
-        gates += "apply_ry(" + std::to_string(angle) + ", "+  std::to_string(val) + ")\n";
+        gates += "circuit.ry(" + std::to_string(angle) + ", "+  std::to_string(val) + ")\n";
     }
 
     void apply_barrier(){
@@ -80,14 +81,20 @@ public:
     }
 
     void execute_basic_quantum(){
-        scr += "backend_name = 'dax_code_simulator'\n";
-        scr += "backend_name = 'dax_code_printer'\n";
-        scr += "backend = dax.get_backend(backend_name)\n";
-        scr += "backend.load_config(\"resources.toml\")\n";
-        scr += "dax_job = execute(circuit, backend, shots=30, optimization_level=0)\n";
-        scr += "client = sequre.UserClient()\n";
-        scr += "workload = dax_job.get_dax()\n";
-        scr += "print(workload)";
+        // scr += "backend_name = 'dax_code_simulator'\n";
+        // scr += "backend_name = 'dax_code_printer'\n";
+        // scr += "backend = dax.get_backend(backend_name)\n";
+        // scr += "backend.load_config(\"resources.toml\")\n";
+        // scr += "dax_job = execute(circuit, backend, shots=30, optimization_level=0)\n";
+        // scr += "client = sequre.UserClient()\n";
+        // scr += "workload = dax_job.get_dax()\n";
+        // scr += "print(workload)";
+
+        scr += "backend = Aer.get_backend('statevector_simulator')\n"; 
+        // scr += "dax_job = execute(circuit, backend, shots=30, optimization_level=0)\n"; 
+        scr += "counts = execute(circuit, backend, shots=100).result().get_counts()\n"; 
+        scr += "counts = json.dumps(counts)\n"; 
+        scr += "print(counts)";
     }
 
     std::string run() {
@@ -119,7 +126,7 @@ private:
         std::ostringstream script;
         script << "import sys\n";
         script << "import json\n";
-        script << "import supermarq\n";
+        //script << "import supermarq\n";
         script << "import qiskit\n";
         script << "import matplotlib.pyplot as plt\n";
         script << "import numpy as np\n";
@@ -258,7 +265,9 @@ std::vector<double> evaluate_new_angles_from_freq_array(std::vector<int> frequen
         }
     }
 
-    std::vector<double> angles(num_qubits);
+    std::vector<double> angles(num_qubits, 0.0);
+    if (total_counts == 0) return angles;
+
     for (int q = 0; q < num_qubits; ++q) {
         double freq_q = static_cast<double>(one_counts[q]) / total_counts;
         angles[q] = freq_q * M_PI;
@@ -297,35 +306,42 @@ int main() {
     }
 
     std::vector<double> angles = evaluate_new_angles_from_freq_array(qubits_freq);
-    omp_set_num_threads(3);
+    omp_set_num_threads(1);
     //QuantumCircuitWrapper *circuit = QuantumCircuitWrapper_create(qubits);
-    std::vector< std::vector<double> > angle_threads(3, angles);
-    #pragma omp parallel
+    std::vector< std::vector<double> > angle_threads(max_threads, angles);
+    #pragma omp parallel shared(angle_threads)
     {
+        cout<<"angle threads size is: "<<angle_threads.size()<<endl;
         for(int k = 0 ; k < 5 ; k++){
+            cout<<"testing"<<endl;
             QuantumCircuitWrapper *circuit = new QuantumCircuitWrapper(qubits);
-            #pragma omp target firstprivate(circuit) device(100) map(to: a[0:N], b[0:N]) map(from: c[0:N])
+            double my_angles[qubits];
+            for(int i = 0 ; i < qubits ; i++){
+                my_angles[i] = angle_threads[omp_get_thread_num()][i];
+            }
+
+            #pragma omp target firstprivate(circuit) device(100) map(to: my_angles[0:qubits], b[0:N]) map(from: c[0:N])
             {
                 // sleep(1);
                 //circuit->apply_hadamard(0);
                 //QuantumCircuitWrapper_apply_hadamard(circuit,0);
                 for(int i = 0 ; i < qubits; i++){
                     //circuit->apply_cnot(i, i+1);
-                    circuit->apply_ry(angle_threads[omp_get_thread_num()][i], i);
+                    circuit->apply_ry(my_angles[i], i);
                     //QuantumCircuitWrapper_apply_cnot(circuit,i,i+1);
                 }
 
-                for(int i = 0 ; i < qubits; i++){
+                for(int i = 0 ; i < qubits-1; i++){
                     circuit->apply_cnot(i, i+1);
                     //QuantumCircuitWrapper_apply_cnot(circuit,i,i+1);
                 }
 
                 for(int i = 0 ; i < qubits-1; i++){
-                    circuit->apply_ry(angle_threads[omp_get_thread_num()][i+1], i+1);
+                    circuit->apply_ry(my_angles[i+1], i+1);
                     //QuantumCircuitWrapper_apply_cnot(circuit,i,i+1);
                 }
                 //circuit->apply_barrier();
-                //QuantumCircuitWrapper_apply_barrier(circuit);
+                //QuantumCircuitWrapper_apply_barrier(circuit); 
                 circuit->measure();
                 //QuantumCircuitWrapper_measure(circuit);
                 //circuit->test = "checking";
@@ -337,8 +353,15 @@ int main() {
                 //printf(" %d ",c[i]);
             }
 
-            angle_threads[omp_get_thread_num()] = evaluate_new_angles_from_freq_array(circuit->evaluated_qubits);
+            cout<<"evaluated qubits freq is: "<<endl;
+            for(int z = 0 ; z < circuit->evaluated_qubits.size() ; z++){
+                cout<<circuit->evaluated_qubits[z]<<" ";
+            }
 
+            cout<<endl;
+            cout<<"angle threads size changed to: " <<angle_threads.size()<<endl;
+            angle_threads[omp_get_thread_num()] = evaluate_new_angles_from_freq_array(circuit->evaluated_qubits);
+            delete circuit;
             // eventually make it memory efficient - call a dstructor here and push object creation outside loop - no need to call construnctor n number of times
         }
     }
