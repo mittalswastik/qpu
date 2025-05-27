@@ -401,11 +401,11 @@ int main() {
     }
 
     std::vector<double> angles = evaluate_new_angles_from_freq_array(qubits_freq);
-    omp_set_num_threads(2);
+    //omp_set_num_threads(1);
     //QuantumCircuitWrapper *circuit = QuantumCircuitWrapper_create(qubits);
     std::vector< std::vector<double> > angle_threads(max_threads, angles);
-    #pragma omp parallel shared(angle_threads)
-    {
+    // #pragma omp parallel shared(angle_threads)
+    // {
         cout<<"angle threads size is: "<<angle_threads.size()<<endl;
         //for(int k = 0 ; k < 5 ; k++){
             cout<<"testing"<<endl;
@@ -458,7 +458,7 @@ int main() {
             delete circuit;
             // eventually make it memory efficient - call a dstructor here and push object creation outside loop - no need to call construnctor n number of times
         //}
-    }
+    //}
 
     // Check results
     // printf("test value now is:  %s\n", (circuit->test).c_str());
