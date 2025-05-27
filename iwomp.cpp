@@ -9,6 +9,8 @@
 #include <array>
 #include <bits/stdc++.h>
 #include <unistd.h>
+#include <sys/wait.h>
+#include <fcntl.h>
 
 #define N 10
 #define max_threads 5
@@ -40,15 +42,14 @@ public:
     std::vector<std::vector<double> > vec_data;
     std::vector<void*> vec_out_data;
     std::vector<int> evaluated_qubits;
-    FILE* pipe_cpp;
-    FILE* pipe_py;
     int num_iterations;
-    pid_t pid[2];
+    pid_t pid;
+    pid_t child_pid;
+    int toPy[2];
+    int fromPy[2];
     
     QuantumCircuitWrapper(int num_qubits) : num_qubits(num_qubits) {
         test = "check";
-        inFD  = -1;   // parent writes   -> child stdin
-        outFD = -1;   // parent reads    <- child stdout
         pid = -1;
     }
 
@@ -56,9 +57,6 @@ public:
         std::cout<<scr<<std::endl;
     }
 
-    void write(double my_angles[num_qubits]){
-
-    }
 
     void apply_hadamard(int qubit) {
         gates += "circuit.h(" + std::to_string(qubit) + ")\n";
@@ -106,7 +104,7 @@ public:
         scr += "    dax_job = execute(circuit, backend, shots=30, optimization_level=0)\n";
         scr += "    client = sequre.UserClient()\n";
         scr += "    workload = dax_job.get_dax()\n";
-        scr += "    print(workload)\n";
+        scr += "    sys.stdout.write(workload)\n";
     }
     
     std::vector<int32_t> parseToVector(void* ptr, size_t size, std::vector<int32_t> vec){
@@ -124,9 +122,20 @@ public:
         return vec;
     }
 
-    std::string run() {
+    void exec_pipes(){
+        //this will be execute by c++ - parent pipe
+        std::string dat = returnJsonString();
+        const char *msg = dat.c_str();
+        write(toPy[1], msg, strlen(msg));
+        char buffer[10000];
+        ssize_t n = read(fromPy[0], buffer, sizeof(buffer)-1);
+        std::string result(buffer, n);
+        evaluated_qubits = readQubits(result, num_qubits);
+    }
+
+    void run() {
         std::string script = generate_python_script("circuit", num_qubits, gates);
-        return execute_python_script(script);
+        execute_python_script(script);
     }
 
 private:
@@ -205,7 +214,7 @@ private:
     //     return qubit_results;
     // }
 
-    std::vector<int> readQubits(const std::string& result) {
+    std::vector<int> readQubits(const std::string& result, int num_qs) {
         Json::Value root;
         Json::CharReaderBuilder reader;
         std::string errs;
@@ -214,18 +223,18 @@ private:
             std::cerr << "Failed to parse JSON: " << errs << std::endl;
             return {};
         }
-    
+
         // Determine the number of possible states (bitstrings)
-        size_t num_states = root.size();
+        size_t num_states = 1 << num_qs;
         std::vector<int> qubit_results(num_states, 0);
-    
+
         // Parse JSON into vector<int> where index represents the bitstring
         for (Json::Value::const_iterator it = root.begin(); it != root.end(); ++it) {
             std::string bitstring = it.key().asString();
             int decimal_index = std::stoi(bitstring, nullptr, 2); // Convert "000", "001" -> 0, 1, 2...
             qubit_results[decimal_index] = it->asInt(); // Store the count at the correct index
         }
-    
+
         return qubit_results;
     }
 
@@ -249,30 +258,64 @@ private:
     }
     
     
-    std::string execute_python_script(const std::string& script) {
+    void execute_python_script(const std::string& script) {
+    
         std::string json_data = returnJsonString();
-        
+
+        int tid = omp_get_thread_num();
+        pid_t pid = getpid();
+        std::ostringstream oss;
+        oss << "temp_script_" << pid << "_" << tid << ".py";
+        std::string filename = oss.str();
+
+
         // Write the script to a temporary file
-        std::ofstream file("temp_script.py");
+        std::ofstream file(filename);
         file << script;
         file.close();
-    
-        // Run the script and capture the output
-        std::string command = "python3 temp_script.py "+json_data+" "+(char) num_iterations;
-        char buffer[4000];
-        std::string result;
-        pipe = popen(command.c_str(), "w+");
-        //if (!pipe) throw std::runtime_error("popen() failed!");
-        
-        while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
-            result += buffer;
+
+        pipe2(toPy, O_CLOEXEC);
+        pipe2(fromPy, O_CLOEXEC);
+
+        child_pid = fork();
+
+        if (child_pid == 0) {
+
+            close(toPy[1]);
+            close(fromPy[0]);
+
+            // redirect stdin / stdout
+            dup2(toPy[0],   STDIN_FILENO);   // stdin  ← pipe read‑end
+            dup2(fromPy[1], STDOUT_FILENO);  // stdout → pipe write‑end
+            // close the original fds (the dup’d copies are already marked CLOEXEC)
+            close(toPy[0]);
+            close(fromPy[1]);
+
+            // build argv:  python3  <file>  <json>  <iterations>  NULL
+            //std::string command = "python3 "+ filename + " " + json_data + " " + (char) num_iterations;
+            std::string num_it_str = std::to_string(num_iterations);
+            execlp("python3","python3", filename.c_str(), json_data.c_str(), num_it_str.c_str(), (char *)nullptr);
         }
-    
-        evaluated_qubits = readQubits(result);
-    
-        pclose(pipe);
-    
-        return result;
+
+        close(toPy[1]);
+        close(fromPy[0]);
+
+        // // Run the script and capture the output
+        // std::string command = "python3 "+ filename + " " + json_data + " " + (char) num_iterations;
+        // char buffer[10000];
+        // std::string result;
+        // FILE* pipe = popen(command.c_str(), "r");
+        // //if (!pipe) throw std::runtime_error("popen() failed!");
+        
+        // while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+        //     result += buffer;
+        // }
+
+        // evaluated_qubits = readQubits(result, num_qubits);
+
+        // pclose(pipe);
+
+        //return result;
     }
 };
 
@@ -395,7 +438,7 @@ int main() {
             #pragma omp target firstprivate(circuit) iteration(5) device(100) map(to: my_angles[0:qubits], b[0:N]) map(from: c[0:N])
             {
                 for(int i = 0 ; i < 5 ; i++){
-                    circuit->write(my_angles);
+                    circuit->exec_pipes();
                     cout<<"evaluated qubits freq is: "<<endl;
                     for(int z = 0 ; z < circuit->evaluated_qubits.size() ; z++){
                         cout<<circuit->evaluated_qubits[z]<<" ";
@@ -407,6 +450,8 @@ int main() {
                     for(int i = 0 ; i < qubits ; i++){
                         my_angles[i] = temp_angles[i];
                     }
+                    circuit->vec_data.clear();
+                    circuit->vec_data.push_back(temp_angles);
                 }
             }
 
