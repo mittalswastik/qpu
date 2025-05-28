@@ -95,16 +95,34 @@ public:
     }
     
     void execute_basic_quantum(){
+        // scr += "backend_name = 'dax_code_simulator'\n";
+        // scr += "backend_name = 'dax_code_printer'\n";
+        // scr += "backend = dax.get_backend(backend_name)\n";
+        // scr += "backend.load_config(\"resources.toml\")\n";
+        // scr += "for i in input_itr:\n";
+        // scr += "    response_data = json.loads(sys.stdin.readline().strip())\n"; // put execute in a loop
+        // scr += "    dax_job = execute(circuit, backend, shots=30, optimization_level=0)\n";
+        // scr += "    client = sequre.UserClient()\n";
+        // scr += "    workload = dax_job.get_dax()\n";
+        // scr += "    sys.stdout.write(workload)\n";
+
         scr += "backend_name = 'dax_code_simulator'\n";
         scr += "backend_name = 'dax_code_printer'\n";
         scr += "backend = dax.get_backend(backend_name)\n";
         scr += "backend.load_config(\"resources.toml\")\n";
-        scr += "for i in input_itr:\n";
-        scr += "    response_data = json.loads(sys.stdin.readline().strip())\n"; // put execute in a loop
+        scr += "print(\"itr val is:\", input_itr, file=sys.stderr, flush=True)\n";
+        scr += "for i in range(input_itr):\n";
+        scr += "    resp = sys.stdin.readline().strip()\n"; // put execute in a loop
+        scr += "    resp = re.sub(r',\\s*]', ']', resp)\n";
+        scr += "    response_data = json.loads(resp)\n";
+        scr += "    if isinstance(response_data, list) and len(response_data)==1 and isinstance(response_data[0], list):\n";
+        scr += "        response_data = response_data[0]\n";
         scr += "    dax_job = execute(circuit, backend, shots=30, optimization_level=0)\n";
         scr += "    client = sequre.UserClient()\n";
-        scr += "    workload = dax_job.get_dax()\n";
+        scr += "    workload = dax_job.get_dax()\n"; //assuming a string is returned
+        //scr += "    workload = json.dumps(response_data)\n";
         scr += "    sys.stdout.write(workload)\n";
+        scr += "    sys.stdout.flush()\n";
     }
     
     std::vector<int32_t> parseToVector(void* ptr, size_t size, std::vector<int32_t> vec){
@@ -122,14 +140,27 @@ public:
         return vec;
     }
 
+    void close_pipes(){
+        close(toPy[1]);
+        close(fromPy[0]);
+    }
+
     void exec_pipes(){
         //this will be execute by c++ - parent pipe
-        std::string dat = returnJsonString();
+        std::string dat = returnJsonString() + '\n';
+        std::cout<<"printing data send to python pipe"<<std::endl;
+        std::cout<<dat<<std::endl;
         const char *msg = dat.c_str();
         write(toPy[1], msg, strlen(msg));
         char buffer[10000];
         ssize_t n = read(fromPy[0], buffer, sizeof(buffer)-1);
+        if (n < 0) {
+            perror("read");          // ← diagnose the real problem
+            return;                  //   or throw / handle as you prefer
+        }
         std::string result(buffer, n);
+        std::cout<<"result from pipe is: "<<std::endl;
+        std::cout<<result<<std::endl;
         evaluated_qubits = readQubits(result, num_qubits);
     }
 
@@ -146,6 +177,7 @@ private:
     std::string generate_python_script(const std::string& circuit_name, int num_qubits, const std::string& gates) {
         std::ostringstream script;
         script << "import sys\n";
+        script << "import re\n";
         script << "import json\n";
         script << "import supermarq\n";
         script << "import qiskit\n";
@@ -250,6 +282,8 @@ private:
             }
 
             json_data += "]";
+            if (i + 1 != vec_data.size())                  // **array** delimiter
+                json_data += ',';
         }
 
         json_data += "]";
