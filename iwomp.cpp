@@ -57,6 +57,16 @@ public:
         std::cout<<scr<<std::endl;
     }
 
+    void create_params(int num_params) {
+        gates += "params = []\n";
+        for(int i=0; i<num_params; i++){
+            gates += "params.append(Parameter('p" + std::to_string(i) + "'))\n";
+        }
+    }
+
+    void apply_ry_param(int param_index, int qubit) {
+        gates +="circuit.ry(params[" + std::to_string(param_index) + "], " + std::to_string(qubit) + ")\n";
+    }
 
     void apply_hadamard(int qubit) {
         gates += "circuit.h(" + std::to_string(qubit) + ")\n";
@@ -95,33 +105,26 @@ public:
     }
     
     void execute_basic_quantum(){
-        // scr += "backend_name = 'dax_code_simulator'\n";
-        // scr += "backend_name = 'dax_code_printer'\n";
-        // scr += "backend = dax.get_backend(backend_name)\n";
-        // scr += "backend.load_config(\"resources.toml\")\n";
-        // scr += "for i in input_itr:\n";
-        // scr += "    response_data = json.loads(sys.stdin.readline().strip())\n"; // put execute in a loop
-        // scr += "    dax_job = execute(circuit, backend, shots=30, optimization_level=0)\n";
-        // scr += "    client = sequre.UserClient()\n";
-        // scr += "    workload = dax_job.get_dax()\n";
-        // scr += "    sys.stdout.write(workload)\n";
-
-        scr += "backend_name = 'dax_code_simulator'\n";
-        scr += "backend_name = 'dax_code_printer'\n";
-        scr += "backend = dax.get_backend(backend_name)\n";
-        scr += "backend.load_config(\"resources.toml\")\n";
-        scr += "print(\"itr val is:\", input_itr, file=sys.stderr, flush=True)\n";
+        scr += "simulator = AerSimulator()\n";
+        // scr += "print(\"itr val is:\", input_itr, file=sys.stderr, flush=True)\n";
         scr += "for i in range(input_itr):\n";
+        scr += "    print(\"Current iteration is:\", i, file=sys.stderr, flush=True)\n";
         scr += "    resp = sys.stdin.readline().strip()\n"; // put execute in a loop
+        // scr += "    print(\"Original from stdin:\",resp, file=sys.stderr, flush=True)\n";
         scr += "    resp = re.sub(r',\\s*]', ']', resp)\n";
+        // scr += "    print(\"After re.sub:\", resp, file=sys.stderr, flush=True)\n";
         scr += "    response_data = json.loads(resp)\n";
-        scr += "    if isinstance(response_data, list) and len(response_data)==1 and isinstance(response_data[0], list):\n";
+        scr += "    if isinstance(response_data, list) and isinstance(response_data[0], list):\n";
         scr += "        response_data = response_data[0]\n";
-        scr += "    dax_job = execute(circuit, backend, shots=30, optimization_level=0)\n";
-        scr += "    client = sequre.UserClient()\n";
-        scr += "    workload = dax_job.get_dax()\n"; //assuming a string is returned
-        //scr += "    workload = json.dumps(response_data)\n";
-        scr += "    sys.stdout.write(workload)\n";
+        scr += "    user_params = response_data\n";
+        // scr += "    print(user_params, response_data)\n";
+        scr += "    vals = [float(p) for p in user_params]\n";
+        scr += "    bound_qc = circuit.assign_parameters({ param: value for param, value in zip(circuit.parameters, vals)})\n";
+        scr += "    job = simulator.run(bound_qc, shots=1024)\n";
+        scr += "    result = job.result()\n";
+        scr += "    counts = result.get_counts()\n";
+        scr += "    counts = json.dumps(counts)\n";
+        scr += "    sys.stdout.write(counts)\n";
         scr += "    sys.stdout.flush()\n";
     }
     
@@ -181,10 +184,7 @@ private:
         script << "import json\n";
         script << "import qiskit\n";
         script << "import matplotlib.pyplot as plt\n";
-        script << "import numpy as np\n";
         script << "from qiskit import QuantumCircuit, execute\n";
-        script << "from qiskit.providers.dax import DAX\n";
-        script << "import sequre\n";
         //processong function
         script << "def process_data(data):\n";
         script << "    # Example processing: square each number\n";
@@ -196,7 +196,7 @@ private:
         script << "        print('Error: No input data provided')\n";
         script << "        sys.exit(1)\n\n";
         script << "    input_itr = json.loads(sys.argv[2])\n";
-        script << "    circuit = QuantumCircuit(" << num_qubits << "," <<num_qubits << ")\n";
+        script << "    circuit = QuantumCircuit(" << num_qubits << ")\n";
         //script << "    processed_data = process_data(input_data)\n";
         std::string line;
         std::istringstream ss(gates);
@@ -255,13 +255,18 @@ private:
             return {};
         }
 
+        // std::cout << "result string:  " << result <<  std::endl;
         // Determine the number of possible states (bitstrings)
+        // std::cout << "num qubits = " << num_qs  << std::endl;
         size_t num_states = 1 << num_qs;
         std::vector<int> qubit_results(num_states, 0);
 
         // Parse JSON into vector<int> where index represents the bitstring
+        // std::cout << "istringstream :  " << s.str() << std::endl;
         for (Json::Value::const_iterator it = root.begin(); it != root.end(); ++it) {
+            // std::cout << "it.key():  " << it.key() << std::endl;
             std::string bitstring = it.key().asString();
+            // std::cout << "bitstring  " << bitstring << std::endl;
             int decimal_index = std::stoi(bitstring, nullptr, 2); // Convert "000", "001" -> 0, 1, 2...
             qubit_results[decimal_index] = it->asInt(); // Store the count at the correct index
         }
@@ -366,35 +371,36 @@ private:
 //     return new_angles;
 // }
 
-std::vector<double> evaluate_new_angles_from_freq_array(std::vector<int> frequencies) {
-    int num_entries = frequencies.size();
-    if (num_entries == 0) return {};
+std::vector<double> evaluate_new_angles_from_freq_array(std::vector<int> frequencies, int num_params) {
+    // int num_entries = frequencies.size();
+    // if (num_entries == 0) return {};
 
-    int num_qubits = 0;
-    while ((1 << num_qubits) < num_entries) ++num_qubits;
+    // int num_qubits = 0;
+    // while ((1 << num_qubits) < num_entries) ++num_qubits;
 
-    std::vector<int> one_counts(num_qubits, 0);
-    int total_counts = 0;
+    // std::vector<int> one_counts(num_qubits, 0);
+    // int total_counts = 0;
 
-    for (int i = 0; i < num_entries; ++i) {
-        int freq = frequencies[i];
-        total_counts += freq;
+    // for (int i = 0; i < num_entries; ++i) {
+    //     int freq = frequencies[i];
+    //     total_counts += freq;
 
-        for (int q = 0; q < num_qubits; ++q) {
-            if ((i >> (num_qubits - q - 1)) & 1) {
-                one_counts[q] += freq;
-            }
-        }
-    }
+    //     for (int q = 0; q < num_qubits; ++q) {
+    //         if ((i >> (num_qubits - q - 1)) & 1) {
+    //             one_counts[q] += freq;
+    //         }
+    //     }
+    // }
 
-    std::vector<double> angles(num_qubits, 0.0);
-    if (total_counts == 0) return angles;
+    // std::vector<double> angles(num_qubits, 0.0);
+    // if (total_counts == 0) return angles;
 
-    for (int q = 0; q < num_qubits; ++q) {
-        double freq_q = static_cast<double>(one_counts[q]) / total_counts;
-        angles[q] = freq_q * M_PI;
-    }
+    // for (int q = 0; q < num_qubits; ++q) {
+    //     double freq_q = static_cast<double>(one_counts[q]) / total_counts;
+    //     angles[q] = freq_q * M_PI;
+    // }
 
+    std::vector<double> angles(num_params, 0.0);
     return angles;
 }
 
@@ -433,7 +439,7 @@ int main() {
         qubits_freq[j] = 0;
     }
 
-    std::vector<double> angles = evaluate_new_angles_from_freq_array(qubits_freq);
+    std::vector<double> angles = evaluate_new_angles_from_freq_array(qubits_freq, 2*qubits);
     //omp_set_num_threads(1);
     //QuantumCircuitWrapper *circuit = QuantumCircuitWrapper_create(qubits);
     std::vector< std::vector<double> > angle_threads(max_threads, angles);
@@ -444,24 +450,22 @@ int main() {
             cout<<"testing"<<endl;
             QuantumCircuitWrapper *circuit = new QuantumCircuitWrapper(qubits);
             double my_angles[qubits];
-            for(int i = 0 ; i < qubits ; i++){
-                my_angles[i] = angle_threads[omp_get_thread_num()][i];
-            }
+            // for(int i = 0 ; i < qubits ; i++){
+            //     my_angles[i] = angle_threads[omp_get_thread_num()][i];
+            // }
+
+            circuit->create_params(2*qubits);
 
             for(int i = 0 ; i < qubits; i++){
-                //circuit->apply_cnot(i, i+1);
-                circuit->apply_ry(my_angles[i], i);
-                //QuantumCircuitWrapper_apply_cnot(circuit,i,i+1);
+                circuit->apply_ry_param(i, i);
             }
 
             for(int i = 0 ; i < qubits-1; i++){
                 circuit->apply_cnot(i, i+1);
-                //QuantumCircuitWrapper_apply_cnot(circuit,i,i+1);
             }
 
-            for(int i = 0 ; i < qubits-1; i++){
-                circuit->apply_ry(my_angles[i+1], i+1);
-                //QuantumCircuitWrapper_apply_cnot(circuit,i,i+1);
+            for(int i = 0 ; i < qubits; i++){
+                circuit->apply_ry_param(qubits+i, i);
             }
             //circuit->apply_barrier();
             //QuantumCircuitWrapper_apply_barrier(circuit); 
@@ -479,12 +483,22 @@ int main() {
 
                     cout<<endl;
                     cout<<"angle threads size changed to: " <<angle_threads.size()<<endl;
-                    std::vector<double> temp_angles = evaluate_new_angles_from_freq_array(circuit->evaluated_qubits);
+                    std::vector<double> temp_angles = evaluate_new_angles_from_freq_array(circuit->evaluated_qubits, 2*qubits);
+                    // cout << "temp_angles  ";
                     for(int i = 0 ; i < qubits ; i++){
                         my_angles[i] = temp_angles[i];
+                        // std::cout << temp_angles[i] << " " ;
                     }
+                    cout << std::endl;
                     circuit->vec_data.clear();
                     circuit->vec_data.push_back(temp_angles);
+                    // std::cout << "Print vec_data for iteration " << std::endl;
+                    for(int k=0; k < circuit->vec_data.size(); k++){
+                        for(int j=0; j < circuit->vec_data[k].size(); j++){
+                            // std::cout << circuit->vec_data[k][j] << " "; // << std::endl; 
+                        }
+                        // std::cout << std::endl;
+                    }
                 }
             }
 
