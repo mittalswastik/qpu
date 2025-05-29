@@ -1,0 +1,5 @@
+INFO:root:CreateWork POST API: 201, b'{"UploadUrl":"http://127.0.0.1:5000/putworkload/dax_code_simulator_573d1985-5cb1-4dab-afdf-da79fb3fba02.json","WorkId":"573d1985-5cb1-4dab-afdf-da79fb3fba02"}\n'
+INFO:root:UpdateDevice request: {'DeviceId': 'dax_code_simulator', 'Priority': 'LOW'}
+INFO:root:UpdateDevice response: {'UploadUrl': 'http://127.0.0.1:5000/putworkload/dax_code_simulator_573d1985-5cb1-4dab-afdf-da79fb3fba02.json', 'WorkId': '573d1985-5cb1-4dab-afdf-da79fb3fba02'}
+INFO:root:s3 upload success
+INFO:root:Uploaded workload

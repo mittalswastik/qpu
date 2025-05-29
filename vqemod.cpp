@@ -9,6 +9,7 @@
 #include <array>
 #include <bits/stdc++.h>
 #include <unistd.h>
+#include <string>
 
 #define N 10
 #define max_threads 5
@@ -18,8 +19,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <cstdio>
-// //#include <llvm-project/offload/include/quantum_circuit_wrapper.h>
-// #include "quantum_circuit_wrapper.h"
+#include <chrono>
 
 using namespace std;
 
@@ -83,17 +83,22 @@ public:
     void execute_basic_quantum(){
         // scr += "backend_name = 'dax_code_simulator'\n";
         // scr += "backend_name = 'dax_code_printer'\n";
-        // scr += "backend = dax.get_backend(backend_name)\n";
+        // scr += "backend = DAX.get_backend(backend_name)\n";
         // scr += "backend.load_config(\"resources.toml\")\n";
-        // scr += "dax_job = execute(circuit, backend, shots=30, optimization_level=0)\n";
+        // scr += "dax_job = execute(circuit, backend, shots=100, optimization_level=0)\n";
         // scr += "client = sequre.UserClient()\n";
         // scr += "workload = dax_job.get_dax()\n";
         // scr += "print(workload)";
 
-        scr += "backend = Aer.get_backend('statevector_simulator')\n"; 
-        // scr += "dax_job = execute(circuit, backend, shots=30, optimization_level=0)\n"; 
-        scr += "counts = execute(circuit, backend, shots=100).result().get_counts()\n"; 
-        scr += "counts = json.dumps(counts)\n"; 
+        scr += "backend = qiskit.Aer.get_backend('statevector_simulator')\n"; 
+        scr += "counts = execute(circuit, backend, shots=100).result().get_counts()\n";
+        scr += "counts = json.dumps(counts)\n";
+        // scr += "work_id = client.create_work(workload=workload,device_id=backend_name, priority=\"LOW\")\n";
+        // scr += "client.wait_until_done(work_id, 0.1)\n";
+        // scr += "results = client.get_results(work_id)\n";
+        // scr += "results = dax_job.get_result_obj(results)\n";
+        // scr += "counts = results.get_counts()\n";
+        // scr += "counts = json.dumps(counts)\n"; 
         scr += "print(counts)";
     }
 
@@ -103,16 +108,16 @@ public:
     }
 
     std::vector<int32_t> parseToVector(void* ptr, size_t size, std::vector<int32_t> vec){
-        std::cout<<" size of the the vector is: "<<size<<std::endl;
+        // std::cout<<" size of the the vector is: "<<size<<std::endl;
         intptr_t intPtr = reinterpret_cast<intptr_t> (ptr); // Cast void* to int*
         int32_t *intVal = reinterpret_cast<int32_t*>(intPtr);
         size = size/sizeof(int32_t);
-        std::cout<<"array value is"<<std::endl;
-        for(int i = 0 ; i < size ; i++){
-            std::cout<<intVal[i]<<" "<<std::endl;
-        }
+        // std::cout<<"array value is"<<std::endl;
+        // for(int i = 0 ; i < size ; i++){
+        //     std::cout<<intVal[i]<<" "<<std::endl;
+        // }
 
-        std::cout<<"end of array value"<<std::endl;
+        // std::cout<<"end of array value"<<std::endl;
         vec.assign(intVal, intVal + size);   // Populate vector using a range
         return vec;
     }
@@ -128,11 +133,9 @@ private:
         script << "import json\n";
         //script << "import supermarq\n";
         script << "import qiskit\n";
-        script << "import matplotlib.pyplot as plt\n";
-        script << "import numpy as np\n";
         script << "from qiskit import QuantumCircuit, execute\n";
-        script << "from qiskit.providers.dax import DAX\n";
-        script << "import sequre\n";
+        // script << "from qiskit.providers.dax import DAX\n";
+        // script << "import sequre\n";
         //processong function
         script << "def process_data(data):\n";
         script << "    # Example processing: square each number\n";
@@ -154,10 +157,10 @@ private:
 
         std::string line2;
         std::istringstream ss2(scr);
-        while(std::getline(ss2, line2)) {
-            std::cout<<line2<<std::endl;    
-            script << "    " << line2 << "\n"; // Adds indentation to each line
-        }
+        // while(std::getline(ss2, line2)) {
+        //     std::cout<<line2<<std::endl;    
+        //     script << "    " << line2 << "\n"; // Adds indentation to each line
+        // }
         //script << gates;
         // script << "    backend_name = 'dax_code_simulator'\n";
         // script << "    backend_name = 'dax_code_printer'\n";
@@ -244,142 +247,113 @@ private:
 //     return new_angles;
 // }
 
-std::vector<double> evaluate_new_angles_from_freq_array(std::vector<int> frequencies) {
-    int num_entries = frequencies.size();
-    if (num_entries == 0) return {};
 
-    int num_qubits = 0;
-    while ((1 << num_qubits) < num_entries) ++num_qubits;
-
-    std::vector<int> one_counts(num_qubits, 0);
-    int total_counts = 0;
-
-    for (int i = 0; i < num_entries; ++i) {
-        int freq = frequencies[i];
-        total_counts += freq;
-
-        for (int q = 0; q < num_qubits; ++q) {
-            if ((i >> (num_qubits - q - 1)) & 1) {
-                one_counts[q] += freq;
-            }
-        }
-    }
-
-    std::vector<double> angles(num_qubits, 0.0);
-    if (total_counts == 0) return angles;
-
-    for (int q = 0; q < num_qubits; ++q) {
-        double freq_q = static_cast<double>(one_counts[q]) / total_counts;
-        angles[q] = freq_q * M_PI;
-    }
-
-    return angles;
-}
-
-// Function to execute a command and get the output
-int main() {
-    // Check for the number of devices available
-    // int num_devices = omp_get_num_devices();
-    // printf("Number of available devices: %d\n", num_devices);
-    
-    // // If no device is available, exit
-    // if (num_devices < 1) {
-    //     printf("No devices available for offloading. Exiting.\n");
-    //     return 1;
-    // }
-
-    // Arrays for computation
-    int a[N], b[N], c[N];
-
-    // Initialize arrays
-    for (int i = 0; i < N; i++) {
-        a[i] = i+1;
-        b[i] = 2 * a[i];
-        c[i] = 0;
-    }
-
-    // Offload computation to GPU (assuming device 0)
-    int qubits = 4;
-    vector<int> qubits_freq(qubits);
-    for(int j = 0 ; j < qubits ; j++){
-        qubits_freq[j] = 0;
-    }
-
-    std::vector<double> angles = evaluate_new_angles_from_freq_array(qubits_freq);
-    omp_set_num_threads(3);
-    //QuantumCircuitWrapper *circuit = QuantumCircuitWrapper_create(qubits);
-    std::vector< std::vector<double> > angle_threads(max_threads, angles);
-    #pragma omp parallel shared(angle_threads)
+int main(int argc, char* argv[]) {
+    if (argc != 3)
     {
-        cout<<"angle threads size is: "<<angle_threads.size()<<endl;
-        for(int k = 0 ; k < 5 ; k++){
-            cout<<"testing"<<endl;
-            QuantumCircuitWrapper *circuit = new QuantumCircuitWrapper(qubits);
-            double my_angles[qubits];
-            for(int i = 0 ; i < qubits ; i++){
-                my_angles[i] = angle_threads[omp_get_thread_num()][i];
-            }
+        cout << "need exactly 2 arguments. Given: " << argc-1 << endl;
+    }
+    // --- 1. File Reading and Data Loading into Map ---
+    std::string filename = "all_runs_cost_history.txt";
+    std::map<int, std::vector<std::vector<double>>> data_by_run;
 
-            #pragma omp target firstprivate(circuit) device(100) map(to: my_angles[0:qubits], b[0:N]) map(from: c[0:N])
-            {
-                // sleep(1);
-                //circuit->apply_hadamard(0);
-                //QuantumCircuitWrapper_apply_hadamard(circuit,0);
-                for(int i = 0 ; i < qubits; i++){
-                    //circuit->apply_cnot(i, i+1);
-                    circuit->apply_ry(my_angles[i], i);
-                    //QuantumCircuitWrapper_apply_cnot(circuit,i,i+1);
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Error: Unable to open file '" << filename << "'" << std::endl;
+        return 1;
+    }
+
+    std::string line;
+    // Skip header
+    if (!std::getline(file, line)) {
+        std::cerr << "Error: File empty or cannot read header." << std::endl;
+        file.close(); return 1;
+    }
+    // std::cout << "Skipped header: " << line << std::endl;
+
+    int line_number = 1;
+    while (std::getline(file, line)) {
+        line_number++;
+        if (line.empty() || line.find_first_not_of(' ') == std::string::npos) continue;
+
+        std::vector<double> current_row_values;
+        std::stringstream ss(line);
+        std::string token;
+        while (std::getline(ss, token, ',')) {
+            try {
+                current_row_values.push_back(std::stod(token));
+            } catch (...) { // Catch potential conversion errors broadly
+                 std::cerr << "Warning [Line " << line_number << "]: Problem converting token '" << token << "'. Skipping value." << std::endl;
+            }
+        }
+
+        if (!current_row_values.empty()) {
+            try {
+                double run_id_double = current_row_values[0];
+                 if (run_id_double < std::numeric_limits<int>::min() || run_id_double > std::numeric_limits<int>::max() || run_id_double != static_cast<int>(run_id_double)) {
+                     throw std::out_of_range("Run ID value not representable as integer");
+                 }
+                int run_id = static_cast<int>(run_id_double);
+                data_by_run[run_id].push_back(current_row_values);
+            } catch (const std::exception& e) {
+                 std::cerr << "Warning [Line " << line_number << "]: Invalid Run ID '" << current_row_values[0] << "' (" << e.what() << "). Skipping row." << std::endl;
+            }
+        }
+    }
+    file.close();
+    // std::cout << "\nFinished reading data. Found " << data_by_run.size() << " unique runs." << std::endl;
+
+    // --- 2. Prepare for OpenMP: Extract Run IDs ---
+    // Create a vector containing the keys (run IDs) from the map.
+    // This vector will be used to distribute work in the parallel loop.
+    std::vector<int> run_ids_vector;
+    run_ids_vector.reserve(data_by_run.size()); // Reserve space for efficiency
+    for (const auto& pair : data_by_run) {
+        run_ids_vector.push_back(pair.first);
+    }
+
+    int qubits = 7;
+    omp_set_num_threads(stoi(argv[1]));
+    int max_iterations = stoi(argv[2]);
+
+
+    auto start = chrono::steady_clock::now();
+    #pragma omp parallel for shared(data_by_run) schedule(static,1)
+        for (int run = 0; run < max_iterations; run++)
+        {
+            double my_angles[2*qubits];
+            for (int iteration = 0; iteration < 80; iteration++){
+                QuantumCircuitWrapper *circuit = new QuantumCircuitWrapper(qubits);
+
+                for(int i = 0 ; i < 2*qubits ; i++){
+                    my_angles[i] = data_by_run[run][iteration][i];
                 }
 
-                for(int i = 0 ; i < qubits-1; i++){
-                    circuit->apply_cnot(i, i+1);
-                    //QuantumCircuitWrapper_apply_cnot(circuit,i,i+1);
+                #pragma omp target firstprivate(circuit) device(100) map(to: my_angles[0:qubits])
+                {
+
+                    for(int i = 0 ; i < qubits; i++){
+                        circuit->apply_ry(my_angles[i], i);
+                    }
+
+                    for(int i = 0 ; i < qubits-1; i++){
+                        circuit->apply_cnot(i, i+1);
+                    }
+
+                    for(int i = 0 ; i < qubits; i++){
+                        circuit->apply_ry(my_angles[qubits+i], i);
+                    }
+                    circuit->measure();
+                    circuit->execute_basic_quantum();
                 }
-
-                for(int i = 0 ; i < qubits-1; i++){
-                    circuit->apply_ry(my_angles[i+1], i+1);
-                    //QuantumCircuitWrapper_apply_cnot(circuit,i,i+1);
-                }
-                //circuit->apply_barrier();
-                //QuantumCircuitWrapper_apply_barrier(circuit); 
-                circuit->measure();
-                //QuantumCircuitWrapper_measure(circuit);
-                //circuit->test = "checking";
-                circuit->execute_basic_quantum();
-                //QuantumCircuitWrapper_execute_basic_quantum(circuit);
-                // for(int i = 0 ; i < N ; i++) {
-                //     c[i] = b[i]/a[i];
-                // }
-                //printf(" %d ",c[i]);
-            }
-
-            cout<<"evaluated qubits freq is: "<<endl;
-            for(int z = 0 ; z < circuit->evaluated_qubits.size() ; z++){
-                cout<<circuit->evaluated_qubits[z]<<" ";
-            }
-
-            cout<<endl;
-            cout<<"angle threads size changed to: " <<angle_threads.size()<<endl;
-            angle_threads[omp_get_thread_num()] = evaluate_new_angles_from_freq_array(circuit->evaluated_qubits);
+            // data_by_run[omp_get_thread_num()] = evaluate_new_angles_from_freq_array(circuit->evaluated_qubits);
             delete circuit;
-            // eventually make it memory efficient - call a dstructor here and push object creation outside loop - no need to call construnctor n number of times
+            }
         }
-    }
+    auto end = chrono::steady_clock::now();
+    auto diff = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+    cout << diff.count() << endl;
+    // cout << "\nParallel processing finished in " << diff.count() << "ms" << endl;
 
-    // Check results
-    // printf("test value now is:  %s\n", (circuit->test).c_str());
-    int errors = 0;
-
-    printf("\n");
-
-    if (errors == 0) {
-        printf("Success! All values are correct. Printing c value below\n");
-        for(int i = 0 ; i < N ; i++){
-            printf("%d",c[i]);
-        }
-    } else {
-        printf("Failed with %d errors.\n", errors);
-    }
-
-    return 0;
+    return 0; // Indicate successful execution
 }
