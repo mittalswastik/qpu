@@ -71,7 +71,7 @@ public:
     }
     
     void apply_ry(double angle, int val) {
-        gates += "apply_ry(" + std::to_string(angle) + ", "+  std::to_string(val) + ")\n";
+        gates += "circuit.ry(" + std::to_string(angle) + ", "+  std::to_string(val) + ")\n";
     }
     
     void apply_barrier(){
@@ -179,7 +179,6 @@ private:
         script << "import sys\n";
         script << "import re\n";
         script << "import json\n";
-        script << "import supermarq\n";
         script << "import qiskit\n";
         script << "import matplotlib.pyplot as plt\n";
         script << "import numpy as np\n";
